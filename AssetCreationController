@@ -1,0 +1,30 @@
+// AssetCreationController.cls
+
+public with sharing class AssetCreationController {
+    
+    @AuraEnabled
+    public static void createAsset(String assetName, String assetDescription, String assetBusinessUnit, Boolean isCompetitor,
+                                   String brandName, String assetType, Decimal capacity, Integer ageOfProduct, Date manufacturingDate,String recordId,String productId) {
+        try {
+            System.debug('RecordID===>' + recordId);
+            Asset newAsset = new Asset();
+            newAsset.Name = assetName;
+            newAsset.Description = assetDescription;
+            newAsset.Business_Unit__c = assetBusinessUnit;
+            newAsset.IsCompetitorProduct = isCompetitor;
+            newAsset.ContactId = recordId;
+            newAsset.Product2Id = productId;
+            if (isCompetitor) {
+                newAsset.Brand_Name__c = brandName;
+                newAsset.Asset_Type__c = assetType;
+                newAsset.Capacity__c = capacity;
+                newAsset.Age_of_Product__c = ageOfProduct;
+                newAsset.Manufacturing_Date__c = manufacturingDate;
+            }
+            
+            insert newAsset;
+        } catch(Exception e) {
+            throw new AuraHandledException('Error occurred while creating asset: ' + e.getMessage());
+        }
+    }
+}
