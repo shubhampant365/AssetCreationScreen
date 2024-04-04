@@ -1,0 +1,32 @@
+<!-- assetCreationForm.html -->
+<template>
+    <lightning-card title="Create New Asset">
+        <div class="slds-p-around_medium">
+            <lightning-input type="checkbox" label="Competitor Product" onchange={handleCheckboxChange}></lightning-input>
+            <lightning-record-picker label="Products" placeholder="Search Product" object-api-name="Product2" onchange={handleProductChange}></lightning-record-picker>
+            <template if:true={showCompetitorForm}>
+
+                <!-- Competitor Product form -->
+                <lightning-combobox label="Business Unit" value={competitorBusinessUnit} options={businessUnitOptions} onchange={handleCompetitorBusinessUnitChange}></lightning-combobox>
+                <lightning-input class="input-field" label="Brand Name" value={brandName} onchange={handleBrandNameChange}></lightning-input>
+                <lightning-input class="input-field" label="Asset Type" value={assetType} onchange={handleAssetTypeChange}></lightning-input>
+                <lightning-input class="input-field" label="Asset Name" value={assetName} onchange={handleAssetNameChange}></lightning-input>
+                <lightning-input class="input-field" label="Capacity" type="number" value={capacity} onchange={handleCapacityChange}></lightning-input>
+                <lightning-input class="input-field" label="Age of Product" type="number" value={ageOfProduct} onchange={handleAgeOfProductChange}></lightning-input>
+                <lightning-input class="input-field" label="Manufacturing Date" type="date" value={manufacturingDate} onchange={handleManufacturingDateChange}></lightning-input>
+            </template>
+            <template if:false={showCompetitorForm}>
+                <!-- Standard Asset form -->
+                <lightning-combobox label="Business Unit" value={assetBusinessUnit} options={businessUnitOptions} onchange={handleAssetBusinessUnitChange}></lightning-combobox>
+                <lightning-input label="Serial Number" value={serialNumber} onchange={handleSerialNumberChange} disabled={serialIdScanned}></lightning-input>
+                <template if:true={showScannerButton}>
+                    <lightning-button label="Open Scanner" onclick={openScanner}></lightning-button>
+                </template>
+                <lightning-input label="Asset Name" value={assetName} onchange={handleAssetNameChange}></lightning-input>
+                <lightning-input label="Description" value={assetDescription} onchange={handleDescriptionChange}></lightning-input>
+                <!-- Add more fields for standard asset -->
+            </template>
+            <lightning-button label="Create Asset" onclick={createAsset}></lightning-button>
+        </div>
+    </lightning-card>
+</template>
