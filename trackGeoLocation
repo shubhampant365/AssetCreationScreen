@@ -1,0 +1,221 @@
+<template>
+ 
+    
+  
+    <!-- After the current location is received,
+         its value is displayed here: -->
+    <template lwc:if={currentLocation}>
+        <div class="slds-var-m-vertical_large slds-var-p-vertical_medium
+                    slds-text-align_left slds-border_top slds-border_bottom">
+           
+            <!-- Current location as latitude and longitude -->
+            Your current location is:
+            <pre>{currentLocationAsString}</pre>
+  
+            <!-- Current location as a map -->
+            <lightning-map map-markers={currentLocationAsMarker} zoom-level=16>
+            </lightning-map>
+        </div>
+    </template>
+  
+    <!-- While request is processing, show spinner -->
+    <div class="slds-var-m-around_large">
+        <template lwc:if={requestInProgress}>
+            <div class="slds-is-relative">
+                <lightning-spinner
+                    alternative-text="Getting location...">
+                </lightning-spinner>
+            </div>
+        </template>
+    </div>
+  
+    <!-- Static help text -->
+    <div class="slds-text-align_center slds-text-color_weak slds-var-m-vertical_large">
+        Click <strong>Get Current Location</strong> 
+    </div>
+                  
+    <!-- The get-current-location button;
+         Disabled if LocationService isn't available -->
+    <div class="slds-align_absolute-center slds-var-m-vertical_large">
+        <lightning-button
+            variant="brand"
+            disabled={locationButtonDisabled}
+            icon-name="utility:target"
+            label="Get Current Location"
+            title="Use your device's GPS and other location sensors to determine your current location"
+            onclick={handleGetCurrentLocationClick}>
+        </lightning-button>
+    </div><br>
+    
+    <lightning-button
+    variant="brand"
+    label="Update Location"
+    title="Update the latitude and longitude fields with your current location"
+    onclick={handleUpdateLocationClick}>
+</lightning-button>
+   
+ </template>
+
+import { LightningElement,api, wire } from 'lwc';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import { getLocationService } from 'lightning/mobileCapabilities';
+import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
+import { updateRecord } from 'lightning/uiRecordApi';
+import { refreshApex } from '@salesforce/apex';
+import getSa from '@salesforce/apex/LocationUpdater.getLocation';
+
+
+export default class geoLocationTrack extends LightningElement {
+    @api recordId;
+    @wire(getSa, { saId: '$recordId' })
+    serviceAppoitnment;
+    myLocationService;
+    currentLocation;
+    locationButtonDisabled = false;
+    requestInProgress = false;
+
+
+    connectedCallback() {
+        this.myLocationService = getLocationService();
+        if (this.myLocationService == null || !this.myLocationService.isAvailable()) {
+            this.locationButtonDisabled = true;
+        }
+    }
+
+
+    handleGetCurrentLocationClick() {
+        this.currentLocation = null;
+
+
+        if (this.myLocationService != null && this.myLocationService.isAvailable()) {
+            const locationOptions = {
+                enableHighAccuracy: true
+            };
+
+
+            this.requestInProgress = true;
+
+
+            this.myLocationService
+                .getCurrentPosition(locationOptions)
+                .then((result) => {
+                    this.currentLocation = result;
+                    console.log(JSON.stringify(result));
+
+
+                    this.dispatchEvent(
+                        new ShowToastEvent({
+                            title: 'Location Detected',
+                            message: 'Location determined successfully.',
+                            variant: 'success'
+                        })
+                    );
+                })
+                .catch((error) => {
+                    console.error(error);
+                    this.dispatchEvent(  
+                        new ShowToastEvent({
+                            title: 'Location error',
+                            message:  + JSON.stringify(error) ,
+                            variant: 'error'                        })
+                    );
+                })
+                .finally(() => {
+                    this.requestInProgress = false;
+                });
+        } else {
+            console.log('Get Location button should be disabled and unclickable. ');
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: 'LocationService Is Not Available',
+                    message: 'Try again from the Salesforce app on a mobile device.',
+                    variant: 'error'
+                })
+            );
+        }
+    }
+
+
+    handleUpdateLocationClick() {
+        const fields = {};
+        if (this.currentLocation) {
+                 fields['Id'] = this.recordId;
+                fields['FSL__InternalSLRGeolocation__Latitude__s'] = this.currentLocation.coords.latitude;
+                fields['FSL__InternalSLRGeolocation__Longitude__s'] = this.currentLocation.coords.longitude;
+                fields['Status'] = 'In Progress';
+
+                const recordInput = { fields };
+
+
+            updateRecord(recordInput)
+                .then((result) => {
+                    this.dispatchEvent(
+                        new ShowToastEvent({
+                            title: 'Location Updated',
+                            message: 'Latitude and longitude fields updated successfully',
+                            variant: 'success'
+                        })
+                    );
+                })
+                .catch((error) => {
+                    this.dispatchEvent(
+                        new ShowToastEvent({
+                            title: 'Location Update Error',
+                            message: error.body.message,
+                            variant: 'error'
+                        })
+                    );
+                })
+                
+        } else {
+                this.dispatchEvent(
+                    new ShowToastEvent({
+                        title: 'Location Not Available',
+                        message: 'Please get your current location before updating',
+                        variant: 'warning'
+                    })
+                );
+            
+        }
+    }
+
+
+    get currentLocationAsString() {
+        return `Lat: ${this.currentLocation.coords.latitude}, Long: ${this.currentLocation.coords.longitude}`;
+    }
+
+
+    get currentLocationAsMarker() {
+        return [{
+            location: {
+                Latitude: this.currentLocation.coords.latitude,
+                Longitude: this.currentLocation.coords.longitude
+            },
+            title: 'My Location'
+        }];
+    }
+    }
+
+
+public with sharing class LocationUpdater {
+    @AuraEnabled(cacheable=true)
+    public static ServiceAppointment getLocation(String saID) {
+        return [SELECT id, FSL__InternalSLRGeolocation__Latitude__s, FSL__InternalSLRGeolocation__Longitude__s FROM ServiceAppointment WHERE id = :saID];
+    }
+
+    @AuraEnabled
+    public static void uploadFile(String recordId, String fileName, String base64Data) {
+        ContentVersion contentVersion = new ContentVersion();
+        contentVersion.Title = fileName;
+        contentVersion.PathOnClient = fileName;
+        contentVersion.VersionData = EncodingUtil.base64Decode(base64Data);
+        insert contentVersion;
+
+        ContentDocumentLink contentDocumentLink = new ContentDocumentLink();
+        contentDocumentLink.ContentDocumentId = [SELECT ContentDocumentId FROM ContentVersion WHERE Id = :contentVersion.Id].ContentDocumentId;
+        contentDocumentLink.LinkedEntityId = recordId;
+        contentDocumentLink.ShareType = 'I';
+        contentDocumentLink.Visibility = 'AllUsers';
+        insert contentDocumentLink;
+    }
+}
